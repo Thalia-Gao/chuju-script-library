@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Jscbc: 全局字体与主题纹理 */
+:root {
+  --font-cn-serif: 'Noto Serif SC', 'Inter', serif;
+}
+* {
+  font-family: var(--font-cn-serif);
+}
+.traditional-pattern {
+  background-image:
+    radial-gradient(circle at 25% 25%, rgba(220, 38, 38, 0.1) 2%, transparent 2%),
+    radial-gradient(circle at 75% 75%, rgba(220, 38, 38, 0.1) 2%, transparent 2%);
+  background-size: 40px 40px;
+}
+.gradient-text {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.card-hover { transition: all .3s ease; }
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,.1), 0 10px 10px -5px rgba(0,0,0,.04);
+}
+.fade-in { animation: fadeIn .5s ease-in; }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+} 
