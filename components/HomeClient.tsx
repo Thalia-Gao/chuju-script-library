@@ -20,8 +20,6 @@ type ScriptItem = {
 // Jscbc: 封面图片组件
 function CoverImage({ script }: { script: ScriptItem }) {
   const [imageSrc, setImageSrc] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     if (!script.coverUrl) {
@@ -30,99 +28,21 @@ function CoverImage({ script }: { script: ScriptItem }) {
       return;
     }
 
-    try {
-      // 尝试解析coverUrl，看是否是任务状态信息
-      const parsed = JSON.parse(script.coverUrl);
-      if (parsed.taskId && parsed.status === "PENDING") {
-        // 正在生成中
-        setIsGenerating(true);
-        setImageSrc(`/api/cover?title=${encodeURIComponent(script.title)}&status=generating`);
-        return;
-      }
-    } catch {
-      // 不是JSON，说明是正常的图片URL
-      if (script.coverUrl.startsWith("/")) {
-        // 本地图片
-        setImageSrc(script.coverUrl);
-      } else if (script.coverUrl.startsWith("http")) {
-        // 外部图片
-        setImageSrc(script.coverUrl);
-      } else {
-        // 其他情况，使用默认封面
-        setImageSrc(`/api/cover?title=${encodeURIComponent(script.title)}`);
-      }
+    // 处理图片URL
+    if (script.coverUrl.startsWith("/")) {
+      // 本地图片
+      setImageSrc(script.coverUrl);
+    } else if (script.coverUrl.startsWith("http")) {
+      // 外部图片
+      setImageSrc(script.coverUrl);
+    } else {
+      // 其他情况，使用默认封面
+      setImageSrc(`/api/cover?title=${encodeURIComponent(script.title)}`);
     }
   }, [script.coverUrl, script.title]);
 
-  // 检查任务状态
-  const checkTaskStatus = async (taskId: string) => {
-    try {
-      setIsLoading(true);
-      const response = await fetch("/api/stills-qwen-status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId })
-      });
-      const data = await response.json();
-      
-      if (data.status === "SUCCEEDED" && data.imageUrl) {
-        // 任务完成，显示生成的图片
-        setImageSrc(data.imageUrl);
-        setIsGenerating(false);
-        // 更新数据库中的cover_url
-        await fetch(`/api/scripts/${script.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cover_url: data.imageUrl })
-        });
-      } else if (data.status === "FAILED") {
-        // 任务失败，显示默认封面
-        setImageSrc(`/api/cover?title=${encodeURIComponent(script.title)}&status=failed`);
-        setIsGenerating(false);
-      }
-    } catch (error) {
-      console.error("检查任务状态失败:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // 如果正在生成中，定期检查状态
-  useEffect(() => {
-    if (!isGenerating) return;
-    
-    try {
-      const parsed = JSON.parse(script.coverUrl || "{}");
-      if (parsed.taskId) {
-        // 每30秒检查一次状态
-        const interval = setInterval(() => {
-          checkTaskStatus(parsed.taskId);
-        }, 30000);
-        
-        return () => clearInterval(interval);
-      }
-    } catch {
-      // 忽略JSON解析错误
-    }
-  }, [isGenerating, script.coverUrl]);
-
   return (
     <div className="aspect-[16/9] bg-gray-100 relative">
-      {isGenerating && (
-        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
-          <div className="text-white text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
-            <div className="text-sm">生成剧照中...</div>
-          </div>
-        </div>
-      )}
-      {isLoading && (
-        <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center z-10">
-          <div className="text-white text-center">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mx-auto"></div>
-          </div>
-        </div>
-      )}
       <img 
         className="w-full h-full object-cover" 
         alt={script.title} 
@@ -258,125 +178,7 @@ export default function HomeClient() {
         </div>
       </section>
 
-      {/* Jscbc: 特殊剧本状态显示 */}
-      <section className="py-6 bg-blue-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-gray-800">剧照生成状态</h2>
-              <div className="flex space-x-3">
-                <Link 
-                  href="/stills-status" 
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-                >
-                  详细监控
-                </Link>
-                <Link 
-                  href="/check-virtual" 
-                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm"
-                >
-                  检查虚拟剧本
-                </Link>
-                <button
-                  onClick={async () => {
-                    try {
-                      const response = await fetch("/api/generate-report", { method: "POST" });
-                      const data = await response.json();
-                      if (data.success) {
-                        alert(`Markdown报告已生成！\n文件保存为: ${data.reportPath}\n虚拟剧本数量: ${data.summary.virtualScripts}`);
-                      } else {
-                        alert(data.message || "生成报告失败");
-                      }
-                    } catch (err) {
-                      alert("生成报告失败: " + (err as Error).message);
-                    }
-                  }}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
-                >
-                  生成MD报告
-                </button>
-                <button
-                  onClick={async () => {
-                    if (confirm('确定要删除所有虚拟剧本吗？此操作不可恢复！')) {
-                      try {
-                        const response = await fetch("/api/cleanup-virtual", { method: "POST" });
-                        const data = await response.json();
-                        if (data.success) {
-                          alert(`清理完成！\n删除了 ${data.deletedCount} 个虚拟剧本\n剩余剧本: ${data.remainingCount} 个\n\n页面将在3秒后自动刷新...`);
-                          setTimeout(() => {
-                            window.location.reload();
-                          }, 3000);
-                        } else {
-                          alert(data.message || "清理失败");
-                        }
-                      } catch (err) {
-                        alert("清理失败: " + (err as Error).message);
-                      }
-                    }
-                  }}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
-                >
-                  清理虚拟剧本
-                </button>
-                <Link 
-                  href="/cleanup" 
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
-                >
-                  清理工具
-                </Link>
-                <Link 
-                  href="/auto-cleanup" 
-                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm"
-                >
-                  🚨 自动清理
-                </Link>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="border border-gray-200 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">征妇认尸</h3>
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <span className="text-sm text-gray-600 mr-2">状态:</span>
-                    <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">生成中</span>
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    任务ID: f6a41234-8dbb-400b-86ec-2df78ef9974d
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    创建时间: 2025-08-16 01:54:56
-                  </div>
-                  <button
-                    onClick={() => {
-                      fetch("/api/stills-qwen-status", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ 
-                          taskId: "f6a41234-8dbb-400b-86ec-2df78ef9974d",
-                          apiKey: "sk-74ef0003c3834d77962e3ad4dc5e7f95"
-                        })
-                      })
-                      .then(res => res.json())
-                      .then(data => {
-                        if (data.status === "SUCCEEDED") {
-                          alert("剧照生成完成！");
-                          fetchData(); // 刷新数据
-                        } else {
-                          alert(`当前状态: ${data.status}`);
-                        }
-                      })
-                      .catch(err => alert("查询失败: " + err.message));
-                    }}
-                    className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
-                  >
-                    检查状态
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+
 
       {/* Grid 3x3 */}
       <section className="py-12">
@@ -385,15 +187,7 @@ export default function HomeClient() {
             <div className="text-center text-gray-500">加载中…</div>
           ) : (
             <>
-              {/* Jscbc: 手动刷新按钮 */}
-              <div className="text-center mb-6">
-                <button
-                  onClick={fetchData}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  刷新剧照状态
-                </button>
-              </div>
+
               
               {/* Jscbc: 桌面端 3 列 */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -442,4 +236,4 @@ export default function HomeClient() {
       </section>
     </div>
   );
-} 
+}
