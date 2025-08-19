@@ -46,7 +46,7 @@ export async function GET(req: Request) {
     era: r.era,
     author: r.author,
     excerpt: r.excerpt,
-    coverUrl: r.cover_url,
+    cover_url: r.cover_url,
     tags: r.tags ? (r.tags as string).split("|") : []
   }));
   

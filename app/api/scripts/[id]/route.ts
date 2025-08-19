@@ -23,6 +23,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     alias: s.alias,
     era: s.era,
     author: s.author,
+    cover_url: s.cover_url,
     tags: s.tags ? (s.tags as string).split("|") : [],
     content
   });

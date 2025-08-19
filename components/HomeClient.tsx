@@ -12,34 +12,37 @@ type ScriptItem = {
   alias?: string;
   era?: string;
   author?: string;
-  coverUrl?: string;
+  cover_url?: string;
   tags: string[];
   excerpt?: string;
 };
 
-// Jscbc: 封面图片组件
+// Jscbc: 封面图片组件（已修复）
 function CoverImage({ script }: { script: ScriptItem }) {
-  const [imageSrc, setImageSrc] = useState<string>("");
+  // 优先使用封面URL，如果无效或加载失败，则回退到API生成的封面
+  const fallbackUrl = `/api/cover?title=${encodeURIComponent(script.title)}`;
 
+  const getInitialSrc = () => {
+    if (script.cover_url && (script.cover_url.startsWith('/') || script.cover_url.startsWith('http'))) {
+      return script.cover_url;
+    }
+    return fallbackUrl;
+  };
+
+  const [imageSrc, setImageSrc] = useState(getInitialSrc());
+
+  // 当剧本数据变化时，更新图片URL
   useEffect(() => {
-    if (!script.coverUrl) {
-      // 没有封面，使用默认的SVG封面
-      setImageSrc(`/api/cover?title=${encodeURIComponent(script.title)}`);
-      return;
-    }
+    setImageSrc(getInitialSrc());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [script.cover_url, script.title]);
 
-    // 处理图片URL
-    if (script.coverUrl.startsWith("/")) {
-      // 本地图片
-      setImageSrc(script.coverUrl);
-    } else if (script.coverUrl.startsWith("http")) {
-      // 外部图片
-      setImageSrc(script.coverUrl);
-    } else {
-      // 其他情况，使用默认封面
-      setImageSrc(`/api/cover?title=${encodeURIComponent(script.title)}`);
+  const handleImageError = () => {
+    // 如果尝试加载的图片失败，立即切换到后备URL
+    if (imageSrc !== fallbackUrl) {
+      setImageSrc(fallbackUrl);
     }
-  }, [script.coverUrl, script.title]);
+  };
 
   return (
     <div className="aspect-[16/9] bg-gray-100 relative">
@@ -47,7 +50,7 @@ function CoverImage({ script }: { script: ScriptItem }) {
         className="w-full h-full object-cover" 
         alt={script.title} 
         src={imageSrc} 
-        onError={() => setImageSrc(`/api/cover?title=${encodeURIComponent(script.title)}`)}
+        onError={handleImageError}
       />
     </div>
   );
@@ -86,8 +89,10 @@ export default function HomeClient() {
     if (activeTag) u.searchParams.set("tags", activeTag);
     u.searchParams.set("page", String(page));
     u.searchParams.set("pageSize", String(PAGE_SIZE));
+    
     const res = await fetch(u.toString(), { cache: "no-store" });
     const json = await res.json();
+    
     setData(json.items || []);
     setTotal(json.total || 0);
     setLoading(false);

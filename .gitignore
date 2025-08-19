@@ -59,12 +59,11 @@ coverage/
 *.tmp
 *.temp
 
-# Scripts and reports
-scripts/
+# Scripts and reports (keep utility scripts, ignore temporary ones)
 virtual-scripts-report.md
 current-task.json
 official-task.json
 
-# Content files (if not needed in repo)
-content/
-public/stills-*/ 
+# Keep content and public directories for the archive
+# content/
+# public/ 
