@@ -300,9 +300,9 @@ export default function AdminDashboard() {
               {activeTab === 'scripts' && (
                 <>
                   <button onClick={() => location.assign('/admin/scripts/new')} className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2">
-                    <PlusIcon />
-                    <span>新增剧本</span>
-                  </button>
+                  <PlusIcon />
+                  <span>新增剧本</span>
+                </button>
                 </>
               )}
             </div>
@@ -390,7 +390,7 @@ export default function AdminDashboard() {
                             }`}
                           >
                             {t}
-                          </button>
+                      </button>
                         ))}
                       </div>
                     </div>
@@ -505,23 +505,42 @@ export default function AdminDashboard() {
                     ) : (
                       users.map((u) => (
                         <tr key={u.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">{u.username}</div>
-                          </td>
+                        </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.username}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.role}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.created_at}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex space-x-2">
-                              <button className="text-green-600 hover:text-green-900">
-                                <EditIcon />
-                              </button>
-                              <button className="text-red-600 hover:text-red-900">
-                                <Trash2Icon />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex space-x-2">
+                            <button onClick={async () => {
+                              const newRole = prompt("输入角色：user 或 admin", u.role);
+                              if (!newRole) return;
+                              try {
+                                const r = await fetch(`/api/users/${u.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: newRole }) });
+                                const j = await r.json();
+                                if (!r.ok) throw new Error(j.error || '更新失败');
+                                alert('已更新');
+                                fetchUsers();
+                              } catch (e:any) { alert(e.message || '失败'); }
+                            }} className="text-green-600 hover:text-green-900">
+                              <EditIcon />
+                            </button>
+                            <button onClick={async () => {
+                              if (!confirm('确定删除该用户？')) return;
+                              try {
+                                const r = await fetch(`/api/users/${u.id}`, { method: 'DELETE' });
+                                const j = await r.json().catch(()=>({}));
+                                if (!r.ok) throw new Error(j.error || '删除失败');
+                                alert('已删除');
+                                fetchUsers();
+                              } catch (e:any) { alert(e.message || '失败'); }
+                            }} className="text-red-600 hover:text-red-900">
+                              <Trash2Icon />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
                       ))
                     )}
                   </tbody>

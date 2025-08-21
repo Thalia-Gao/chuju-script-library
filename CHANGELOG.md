@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.0.4
+- Jscbc: 导航栏仅对 admin 显示“管理后台”，普通用户隐藏
+- Jscbc: 新增用户管理 API：`PATCH /api/users/[id]`、`DELETE /api/users/[id]`，含最小管理员保护
+- Jscbc: 剧本详情“剧本全文”默认收起，登录后可“展开全文”
+- Jscbc: 登录/注册成功后统一跳转首页；注册成功弹窗提示
+- Jscbc: 将指定账号提升为管理员权限
+
 ## v1.0.3 (Admin improvements & AI fixes)
 
 - Admin 控制台：

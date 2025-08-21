@@ -1,11 +1,13 @@
 /**
  * Jscbc: 剧本详情页（改为直接读 DB 与本地文件，避免 SSR 自身网络请求超时）
  */
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import Link from "next/link";
-import { get } from "@/lib/db";
+import { get, run } from "@/lib/db";
 import fs from "fs";
+import path from "path";
+import dynamic from "next/dynamic";
+
+const CollapsibleMarkdown = dynamic(() => import("@/components/CollapsibleMarkdown"), { ssr: false });
 
  type ScriptData = {
   id: string;
@@ -30,7 +32,22 @@ async function fetchDetailDirect(id: string): Promise<ScriptData | null> {
     [id]
   );
   if (!s) return null;
-  const content = fs.readFileSync(s.markdown_path, "utf-8");
+
+  // 兼容旧路径：若存储的绝对路径失效，则回退到当前工程 content/scripts 下搜索同名文件
+  let filePath: string | null = null;
+  if (s.markdown_path && fs.existsSync(s.markdown_path)) {
+    filePath = s.markdown_path as string;
+  } else {
+    const base = path.basename(String(s.markdown_path || "")) || `${s.id}.md`;
+    const candidate = path.join(process.cwd(), "content", "scripts", base);
+    if (fs.existsSync(candidate)) {
+      filePath = candidate;
+      try { run("UPDATE scripts SET markdown_path=? WHERE id=?", [candidate, id]); } catch {}
+    }
+  }
+
+  const content = filePath ? fs.readFileSync(filePath, "utf-8") : "（提示）原始剧本文本文件缺失，可能已被移动或删除。";
+
   return {
     id: s.id,
     title: s.title,
@@ -153,11 +170,7 @@ export default async function ScriptPage({ params }: { params: { id: string } })
               <h2 className="text-xl font-semibold text-gray-800">剧本全文</h2>
             </div>
             <div className="p-6 sm:p-8">
-              <article className="prose prose-lg max-w-none">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {data.content}
-                </ReactMarkdown>
-              </article>
+              <CollapsibleMarkdown content={data.content} />
             </div>
           </section>
         </div>

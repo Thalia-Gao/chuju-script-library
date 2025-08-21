@@ -38,7 +38,10 @@ export default function AuthClient() {
       if (!res.ok) {
         throw new Error(json.error || `${mode === "login" ? "登录" : "注册"}失败`);
       }
-      router.push("/admin");
+      if (mode === "register") {
+        try { alert("注册成功"); } catch {}
+      }
+      router.push("/");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -64,22 +67,16 @@ export default function AuthClient() {
             </div>
 
             <form className="space-y-6" onSubmit={handleSubmit}>
-              {mode === "register" && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">邮箱地址</label>
-                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" />
-                </div>
-              )}
-              {mode === "login" && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">邮箱地址</label>
-                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" />
-                </div>
-              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">邮箱地址</label>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700">密码</label>
                 <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" />
               </div>
+
               {mode === "register" && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700">确认密码</label>
@@ -94,8 +91,7 @@ export default function AuthClient() {
                     <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">记住我</label>
                   </div>
                   <div className="text-sm">
-                    <a href="/forgot-password"
-                       className="font-medium text-red-600 hover:text-red-500">忘记密码？</a>
+                    <a href="/forgot-password" className="font-medium text-red-600 hover:text-red-500">忘记密码？</a>
                   </div>
                 </div>
               )}

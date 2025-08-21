@@ -1,10 +1,43 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [initials, setInitials] = useState<string | null>(null);
+  const [role, setRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch('/api/auth/me', { cache: 'no-store' });
+        const json = await res.json();
+        const username: string | undefined = json?.user?.username;
+        const r: string | undefined = json?.user?.role;
+        if (username) {
+          const init = username.slice(0, 3).toUpperCase();
+          setInitials(init);
+          setRole(r || null);
+        } else {
+          setInitials(null);
+          setRole(null);
+        }
+      } catch {}
+    };
+    load();
+  }, [pathname]);
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      setInitials(null);
+      setRole(null);
+      router.push('/');
+    } catch {}
+  };
 
   const linkStyles = (path: string) => {
     const isActive = pathname === path;
@@ -35,12 +68,23 @@ export default function Navbar() {
             <Link href="/" className={linkStyles('/')}>
               首页
             </Link>
-            <Link href="/login" className={linkStyles('/login')}>
-              登录/注册
-            </Link>
-            <Link href="/admin" className={adminLinkStyles('/admin')}>
-              管理后台
-            </Link>
+            {initials ? (
+              <div className="flex items-center space-x-3">
+                <div className="px-3 py-2 rounded-lg bg-gray-100 text-gray-800 font-semibold" title="已登录用户">
+                  {initials}
+                </div>
+                <button onClick={handleLogout} className="text-gray-700 hover:text-red-600 font-medium">退出</button>
+              </div>
+            ) : (
+              <Link href="/login" className={linkStyles('/login')}>
+                登录/注册
+              </Link>
+            )}
+            {role === 'admin' && (
+              <Link href="/admin" className={adminLinkStyles('/admin')}>
+                管理后台
+              </Link>
+            )}
           </div>
         </div>
       </div>
