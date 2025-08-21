@@ -73,70 +73,64 @@ export default function HomeClient() {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
-  const initedRef = useRef(false);
 
-  const [query, setQuery] = useState("");
-  const [activeTag, setActiveTag] = useState<string | null>(null);
+  // Jscbc: URL is the single source of truth.
+  const query = sp.get("q") || "";
+  const activeTag = sp.get("tags") || null;
+  const page = parseInt(sp.get("page") || "1", 10);
+
   const [data, setData] = useState<ScriptItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
+  
+  // Jscbc: Local state for controlled input, which triggers URL change on debounce.
+  const [localQuery, setLocalQuery] = useState(query);
 
-  const fetchData = async () => {
-    setLoading(true);
-    const u = new URL("/api/scripts", window.location.origin);
-    if (query.trim()) u.searchParams.set("q", query.trim());
-    if (activeTag) u.searchParams.set("tags", activeTag);
-    u.searchParams.set("page", String(page));
-    u.searchParams.set("pageSize", String(PAGE_SIZE));
-    
-    const res = await fetch(u.toString(), { cache: "no-store" });
-    const json = await res.json();
-    
-    setData(json.items || []);
-    setTotal(json.total || 0);
-    setLoading(false);
+  // Jscbc: Single useEffect for data fetching, triggered by URL change.
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      const u = new URL("/api/scripts", window.location.origin);
+      if (query.trim()) u.searchParams.set("q", query.trim());
+      if (activeTag) u.searchParams.set("tags", activeTag);
+      u.searchParams.set("page", String(page));
+      u.searchParams.set("pageSize", String(PAGE_SIZE));
+      
+      const res = await fetch(u.toString(), { cache: "no-store" });
+      const json = await res.json();
+      
+      setData(json.items || []);
+      setTotal(json.total || 0);
+      setLoading(false);
+    };
+    fetchData();
+  }, [sp, query, activeTag, page]);
+
+  // Jscbc: Debounce search input to avoid excessive URL updates.
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (localQuery !== query) {
+        updateUrl({ q: localQuery, page: 1 });
+      }
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [localQuery, query]);
+
+  // Jscbc: Helper function to update URL search params.
+  const updateUrl = (params: Record<string, string | number | null>) => {
+    const u = new URL(window.location.href);
+    Object.entries(params).forEach(([key, value]) => {
+      if (value === null || value === undefined) {
+        u.searchParams.delete(key);
+      } else {
+        u.searchParams.set(key, String(value));
+      }
+    });
+    router.push(u.pathname + u.search, { scroll: false });
   };
 
-  // 初始化：从 URL 读取 q/tags/page
-  useEffect(() => {
-    if (initedRef.current) return;
-    const qp = sp?.get("q") || "";
-    const tp = sp?.get("tags");
-    const pp = parseInt(sp?.get("page") || "1", 10) || 1;
-    if (qp) setQuery(qp);
-    if (tp) setActiveTag(tp);
-    if (pp !== 1) setPage(pp);
-    initedRef.current = true;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // 数据加载
-  useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
-
-  // 搜索/切换标签时跳回第1页并刷新
-  useEffect(() => {
-    if (!initedRef.current) return;
-    const handler = setTimeout(() => { setPage(1); fetchData(); }, 250);
-    return () => clearTimeout(handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, activeTag]);
-
-  // 将分页与筛选同步到 URL（无刷新）
-  useEffect(() => {
-    if (!initedRef.current) return;
-    const u = new URL(window.location.href);
-    if (query.trim()) u.searchParams.set("q", query.trim()); else u.searchParams.delete("q");
-    if (activeTag) u.searchParams.set("tags", activeTag); else u.searchParams.delete("tags");
-    u.searchParams.set("page", String(page));
-    router.replace(`${pathname}${u.search}`, { scroll: false });
-  }, [query, activeTag, page, pathname, router]);
-
-  const chips = useMemo(() => ["全部", ...TAGS], []);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const chips = useMemo(() => ["全部", ...TAGS], []);
 
   return (
     <div className="min-h-screen">
@@ -149,14 +143,13 @@ export default function HomeClient() {
           <div className="max-w-2xl mx-auto">
             <div className="relative">
               <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") fetchData(); }}
+                value={localQuery}
+                onChange={(e) => setLocalQuery(e.target.value)}
                 type="text"
                 placeholder="搜索剧目、作者、年代..."
                 className="w-full px-6 py-4 text-gray-800 rounded-full shadow-lg focus:outline-none focus:ring-4 focus:ring-red-300"
               />
-              <button onClick={fetchData} className="absolute right-2 top-2 bg-red-600 text-white p-2 rounded-full hover:bg-red-700">
+              <button onClick={() => updateUrl({ q: localQuery, page: 1 })} className="absolute right-2 top-2 bg-red-600 text-white p-2 rounded-full hover:bg-red-700">
                 搜索
               </button>
             </div>
@@ -171,7 +164,7 @@ export default function HomeClient() {
             {chips.map((t) => (
               <button
                 key={t}
-                onClick={() => setActiveTag(t === "全部" ? null : t)}
+                onClick={() => updateUrl({ tags: t === "全部" ? null : t, page: 1 })}
                 className={`px-4 py-2 rounded-full border border-red-200 hover:bg-red-50 transition-colors text-sm ${
                   (t === "全部" && !activeTag) || activeTag === t ? "bg-red-600 text-white border-red-600" : ""
                 }`}
@@ -215,23 +208,23 @@ export default function HomeClient() {
               <div className="flex items-center justify-center gap-3 mt-8">
                 <button
                   disabled={page <= 1}
-                  onClick={() => setPage(1)}
+                  onClick={() => updateUrl({ page: 1 })}
                   className="px-3 py-1 rounded border disabled:opacity-50"
                 >首页</button>
                 <button
                   disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  onClick={() => updateUrl({ page: page - 1 })}
                   className="px-3 py-1 rounded border disabled:opacity-50"
                 >上一页</button>
                 <span className="text-sm text-gray-600">第 {page} / {totalPages} 页</span>
                 <button
                   disabled={page >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  onClick={() => updateUrl({ page: page + 1 })}
                   className="px-3 py-1 rounded border disabled:opacity-50"
                 >下一页</button>
                 <button
                   disabled={page >= totalPages}
-                  onClick={() => setPage(totalPages)}
+                  onClick={() => updateUrl({ page: totalPages })}
                   className="px-3 py-1 rounded border disabled:opacity-50"
                 >尾页</button>
               </div>

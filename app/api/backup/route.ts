@@ -12,7 +12,7 @@ export async function GET() {
     const output = fs.createWriteStream(tmp);
     const archive = archiver("zip", { zlib: { level: 9 } });
     output.on("close", () => resolve());
-    archive.on("error", (err) => reject(err));
+    archive.on("error", (err: any) => reject(err));
     archive.pipe(output);
     archive.directory(path.join(process.cwd(), "data"), "data");
     archive.directory(path.join(process.cwd(), "content"), "content");

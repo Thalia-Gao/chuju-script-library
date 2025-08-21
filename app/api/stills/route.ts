@@ -7,8 +7,6 @@ import fs from "fs";
 import path from "path";
 import OpenAI from "openai";
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 function buildImagePrompt(title: string, content: string) {
   const abstract = content
     .replace(/\r/g, "")
@@ -32,6 +30,11 @@ const allowedSizes = new Set([
 
 export async function POST(req: Request) {
   try {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ error: "缺少 OPENAI_API_KEY" }, { status: 500 });
+    }
+    const client = new OpenAI({ apiKey });
     const body = await req.json().catch(() => ({}));
     const titles: string[] = body?.titles || [];
     const wantSize: string = body?.size || "1792x1024"; // 16:9

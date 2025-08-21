@@ -7,23 +7,12 @@ import { all, get } from "@/lib/db";
 import fs from "fs";
 import OpenAI from "openai";
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-function loadCorpus(limit = 50) {
-  const rows = all<any>("SELECT id, title, alias, era, author, markdown_path FROM scripts ORDER BY created_at DESC");
-  const docs = rows.slice(0, limit).map((r) => ({
-    id: r.id,
-    title: r.title,
-    era: r.era,
-    author: r.author,
-    text: fs.readFileSync(r.markdown_path, "utf-8").slice(0, 5000)
-  }));
-  const mini = new MiniSearch({ fields: ["title", "text", "era", "author"], storeFields: ["title", "text"] });
-  mini.addAll(docs);
-  return { mini, docs };
-}
-
 export async function POST(req: Request) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json({ error: "缺少 OPENAI_API_KEY" }, { status: 500 });
+  }
+  const client = new OpenAI({ apiKey });
   const body = await req.json();
   const { mode, query, params } = body || {};
   if (!mode) return NextResponse.json({ error: "缺少 mode" }, { status: 400 });
@@ -60,4 +49,18 @@ export async function POST(req: Request) {
   });
   const text = resp.choices?.[0]?.message?.content || "";
   return NextResponse.json({ text });
+}
+
+function loadCorpus(limit = 50) {
+  const rows = all<any>("SELECT id, title, alias, era, author, markdown_path FROM scripts ORDER BY created_at DESC");
+  const docs = rows.slice(0, limit).map((r) => ({
+    id: r.id,
+    title: r.title,
+    era: r.era,
+    author: r.author,
+    text: fs.readFileSync(r.markdown_path, "utf-8").slice(0, 5000)
+  }));
+  const mini = new MiniSearch({ fields: ["title", "text", "era", "author"], storeFields: ["title", "text"] });
+  mini.addAll(docs);
+  return { mini, docs };
 } 

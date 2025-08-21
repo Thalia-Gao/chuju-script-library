@@ -17,8 +17,8 @@ export async function POST(req: Request) {
     console.log(`数据库中共有 ${scripts.length} 个剧本记录`);
 
     // 检查每个剧本的文件是否存在
-    const virtualScripts = [];
-    const validScripts = [];
+    const virtualScripts: Array<{ id: string; title: string; markdown_path?: string }> = [];
+    const validScripts: Array<{ id: string; title: string; markdown_path?: string }> = [];
 
     scripts.forEach((script: any) => {
       if (script.markdown_path && fs.existsSync(script.markdown_path)) {
