@@ -47,6 +47,11 @@ CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT
 );
+-- 聚合指标表
+CREATE TABLE IF NOT EXISTS metrics (
+  key TEXT PRIMARY KEY,
+  value INTEGER NOT NULL DEFAULT 0
+);
 `);
 
 export function run<T = unknown>(sql: string, params?: any[]): void {

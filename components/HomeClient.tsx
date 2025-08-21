@@ -6,6 +6,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+// 访问统计：页面首次渲染计数（防抖）
+function useCountViewOnce() {
+	const countedRef = useRef(false);
+	useEffect(() => {
+		if (countedRef.current) return;
+		countedRef.current = true;
+		fetch("/api/admin/stats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: "total_views", delta: 1 }) })
+			.catch(() => {});
+	}, []);
+}
+
 type ScriptItem = {
   id: string;
   title: string;
@@ -73,6 +84,8 @@ export default function HomeClient() {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
+
+  useCountViewOnce();
 
   // Jscbc: URL is the single source of truth.
   const query = sp.get("q") || "";

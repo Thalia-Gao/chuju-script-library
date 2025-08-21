@@ -49,13 +49,68 @@ type ScriptItem = {
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "scripts" | "users" | "settings" | "assistant">("scripts");
-  const [searchTerm, setSearchTerm] = useState("");
   const [scripts, setScripts] = useState<ScriptItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalScripts, setTotalScripts] = useState(0); // Jscbc: 新增总剧本数状态
   const [currentPage, setCurrentPage] = useState(1); // Jscbc: 新增当前页码
   const [pageSize, setPageSize] = useState(20); // Jscbc: 新增每页显示数量
   const router = useRouter();
+
+  // 仪表盘统计
+  const [stats, setStats] = useState<{scripts: number; users: number; views: number; creations: number}>({scripts: 0, users: 0, views: 0, creations: 0});
+  const fetchStats = async () => {
+    try {
+      const res = await fetch("/api/admin/stats");
+      const json = await res.json();
+      setStats({ scripts: json.scripts || 0, users: json.users || 0, views: json.views || 0, creations: json.creations || 0 });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // 标签筛选
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  type TagGroups = Record<string, string[]>; // 分组名 -> 标签
+  const [tagGroups, setTagGroups] = useState<TagGroups>({});
+  const categorizeTag = (name: string): string => {
+    // 简易分组：题材/年代/体裁/结构/表演/其他
+    const topic = ["历史故事","民间传说","现实生活","爱情婚姻","社会批判","忠孝节义"];
+    const era = ["古代剧本","近代剧本","现代剧本"]; 
+    const genre = ["正剧","喜剧","悲剧"]; 
+    const structure = ["全本","折子戏","片段","完整版","简缩版"]; 
+    const style = ["武戏","文戏","综合性"]; 
+    if (topic.includes(name)) return "题材";
+    if (era.includes(name)) return "年代";
+    if (genre.includes(name)) return "体裁";
+    if (structure.includes(name)) return "结构";
+    if (style.includes(name)) return "表演";
+    return "其他";
+  };
+  const fetchAllTags = async () => {
+    try {
+      const r = await fetch("/api/tags");
+      const j = await r.json();
+      const names: string[] = (j.items || []).map((x: any) => x.name).filter(Boolean);
+      // 去重，过滤掉数据库内可能存在的“全部”
+      const unique = Array.from(new Set(names.filter(n => n !== "全部"))).sort((a, b) => a.localeCompare(b, "zh-Hans-CN"));
+      setAvailableTags(["全部", ...unique]);
+      // 分组
+      const groups: TagGroups = {};
+      for (const t of unique) {
+        const g = categorizeTag(t);
+        groups[g] = groups[g] || [];
+        groups[g].push(t);
+      }
+      // 保证每组内部也排序
+      Object.keys(groups).forEach(k => groups[k].sort((a,b)=>a.localeCompare(b, "zh-Hans-CN")));
+      setTagGroups(groups);
+    } catch (e) {
+      console.error(e);
+      setAvailableTags(["全部"]);
+      setTagGroups({});
+    }
+  };
 
   // Jscbc: AI助手相关状态
   const [aiMode, setAiMode] = useState<"idea"|"segment"|"review">("idea");
@@ -73,10 +128,12 @@ export default function AdminDashboard() {
     try {
       const res = await fetch("/api/assistant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
         mode: aiMode,
-        params: { theme: aiTheme, genre: aiGenre, era: aiEra, roles: aiRoles.split(/[,\s]+/).filter(Boolean), draft: aiDraft }
+        params: { theme: aiTheme, genre: aiGenre, era: aiEra, roles: aiRoles.split(/[,-\s]+/).filter(Boolean), draft: aiDraft }
       }) });
       const json = await res.json();
       setAiOut(json.text || "");
+      // 成功后刷新创作计数
+      fetchStats();
     } catch (error) {
       console.error("AI Assistant error:", error);
       setAiOut("生成失败，请检查API密钥或网络连接。");
@@ -89,13 +146,12 @@ export default function AdminDashboard() {
   const fetchScripts = async (page = 1) => {
     setLoading(true);
     try {
-      // 添加分页参数来显示所有剧本，包括重复标题
-      const res = await fetch(`/api/scripts?showAll=true&page=${page}&pageSize=${pageSize}`);
+      const tagParam = selectedTag && selectedTag !== "全部" ? `&tags=${encodeURIComponent(selectedTag)}` : "";
+      const res = await fetch(`/api/scripts?page=${page}&pageSize=${pageSize}${tagParam}`);
       if (!res.ok) throw new Error("Failed to fetch scripts");
       const data = await res.json();
-      // Jscbc: 假设API返回的items结构与ScriptItem匹配
       setScripts(data.items || []);
-      setTotalScripts(data.total || 0); // Jscbc: 更新总剧本数
+      setTotalScripts(data.total || 0);
       setCurrentPage(page);
     } catch (error) {
       console.error("Error fetching scripts:", error);
@@ -106,11 +162,35 @@ export default function AdminDashboard() {
     }
   };
 
+  // 用户列表
+  const [users, setUsers] = useState<Array<{id:string; username:string; role:string; created_at:string}>>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const fetchUsers = async () => {
+    setUsersLoading(true);
+    try {
+      const r = await fetch('/api/users');
+      const j = await r.json();
+      setUsers(j.items || []);
+    } catch (e) {
+      console.error(e);
+      setUsers([]);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === "scripts") {
+      if (availableTags.length === 0) fetchAllTags();
       fetchScripts(1);
     }
-  }, [activeTab, pageSize]);
+    if (activeTab === "dashboard") {
+      fetchStats();
+    }
+    if (activeTab === 'users') {
+      fetchUsers();
+    }
+  }, [activeTab, pageSize, selectedTag]);
 
   // Jscbc: 处理页码变化
   const handlePageChange = (page: number) => {
@@ -208,21 +288,22 @@ export default function AdminDashboard() {
               {activeTab === 'assistant' && 'AI 剧本助手'} {/* Jscbc: 新增AI助手标题 */}
             </h1>
             <div className="flex items-center space-x-4">
-              <div className="relative">
-                <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="搜索..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-200 rounded-full focus:outline-none focus:ring-1 focus:ring-gray-300 focus:border-transparent w-64 transition-all duration-300 ease-in-out"
-                />
-              </div>
+
+              {activeTab === 'dashboard' && (
+                <button onClick={async () => {
+                  try {
+                    await fetch('/api/admin/stats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'refresh' }) });
+                    await fetchStats();
+                  } catch (e) { console.error(e); }
+                }} className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">刷新数据</button>
+              )}
               {activeTab === 'scripts' && (
-                <button className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2">
-                  <PlusIcon />
-                  <span>新增剧本</span>
-                </button>
+                <>
+                  <button onClick={() => location.assign('/admin/scripts/new')} className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2">
+                    <PlusIcon />
+                    <span>新增剧本</span>
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -232,28 +313,28 @@ export default function AdminDashboard() {
         <div className="p-6">
           {activeTab === 'dashboard' && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {/* Dashboard Cards - Placeholder */}
+              {/* Dashboard Cards */}
               <div className="bg-white p-6 rounded-xl shadow-lg">
                 <div className="flex items-center justify-between">
-                  <div><p className="text-gray-500 text-sm">总剧本数</p><p className="text-3xl font-bold text-gray-900">{totalScripts}</p></div>
+                  <div><p className="text-gray-500 text-sm">总剧本数</p><p className="text-3xl font-bold text-gray-900">{stats.scripts}</p></div>
                   <DatabaseIcon className="w-12 h-12 text-red-600" />
                 </div>
               </div>
               <div className="bg-white p-6 rounded-xl shadow-lg">
                 <div className="flex items-center justify-between">
-                  <div><p className="text-gray-500 text-sm">注册用户</p><p className="text-3xl font-bold text-gray-900">1,234</p></div>
+                  <div><p className="text-gray-500 text-sm">注册用户</p><p className="text-3xl font-bold text-gray-900">{stats.users.toLocaleString()}</p></div>
                   <UsersIcon className="w-12 h-12 text-blue-600" />
                 </div>
               </div>
               <div className="bg-white p-6 rounded-xl shadow-lg">
                 <div className="flex items-center justify-between">
-                  <div><p className="text-gray-500 text-sm">总浏览量</p><p className="text-3xl font-bold text-gray-900">56,789</p></div>
+                  <div><p className="text-gray-500 text-sm">总浏览量</p><p className="text-3xl font-bold text-gray-900">{stats.views.toLocaleString()}</p></div>
                   <EyeIcon className="w-12 h-12 text-green-600" />
                 </div>
               </div>
               <div className="bg-white p-6 rounded-xl shadow-lg">
                 <div className="flex items-center justify-between">
-                  <div><p className="text-gray-500 text-sm">下载次数</p><p className="text-3xl font-bold text-gray-900">12,345</p></div>
+                  <div><p className="text-gray-500 text-sm">剧本创作次数</p><p className="text-3xl font-bold text-gray-900">{stats.creations.toLocaleString()}</p></div>
                   <UploadIcon className="w-12 h-12 text-purple-600" />
                 </div>
               </div>
@@ -282,17 +363,38 @@ export default function AdminDashboard() {
                         <option value={100}>100</option>
                       </select>
                     </div>
-                    <div className="flex space-x-2">
-                      <button className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-                        <FilterIcon />
-                        <span>筛选</span>
-                      </button>
-                      <button className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-                        <UploadIcon />
-                        <span>批量导入</span>
-                      </button>
-                    </div>
                   </div>
+                </div>
+                {/* 标签筛选行 */}
+                <div className="mt-4 space-y-3">
+                  {/* 顶部“全部” */}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => { setSelectedTag(null); setCurrentPage(1); }}
+                      className={`px-3 py-1 rounded-full border text-sm transition-colors ${
+                        !selectedTag ? "bg-red-600 text-white border-red-600" : "bg-white text-red-600 border-red-200 hover:bg-red-50"
+                      }`}
+                    >全部</button>
+                  </div>
+                  {/* 分组标签 */}
+                  {Object.keys(tagGroups).sort((a,b)=>a.localeCompare(b, "zh-Hans-CN")).map((group) => (
+                    <div key={group} className="flex flex-wrap gap-2 items-center">
+                      <span className="text-xs text-gray-500 w-10">{group}</span>
+                      <div className="flex flex-wrap gap-2">
+                        {tagGroups[group].map((t) => (
+                          <button
+                            key={t}
+                            onClick={() => { setSelectedTag(t); setCurrentPage(1); }}
+                            className={`px-3 py-1 rounded-full border text-sm transition-colors ${
+                              selectedTag === t ? "bg-red-600 text-white border-red-600" : "bg-white text-red-600 border-red-200 hover:bg-red-50"
+                            }`}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -391,44 +493,37 @@ export default function AdminDashboard() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户信息</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">邮箱</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">角色</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最后登录</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建时间</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {/* Dummy User Data */}
-                    {[ 
-                      { id: 1, name: '张文华', email: 'zhang@email.com', role: '管理员', status: '活跃', lastLogin: '2024-01-15' },
-                      { id: 2, name: '李明月', email: 'li@email.com', role: '编辑', status: '活跃', lastLogin: '2024-01-14' },
-                      { id: 3, name: '王小红', email: 'wang@email.com', role: '用户', status: '非活跃', lastLogin: '2024-01-10' }
-                    ].map((user) => (
-                      <tr key={user.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.email}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.role}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            user.status === '活跃' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {user.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.lastLogin}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <div className="flex space-x-2">
-                            <button className="text-green-600 hover:text-green-900">
-                              <EditIcon />
-                            </button>
-                            <button className="text-red-600 hover:text-red-900">
-                              <Trash2Icon />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {usersLoading ? (
+                      <tr><td colSpan={5} className="px-6 py-4 text-center text-gray-500">加载中...</td></tr>
+                    ) : users.length === 0 ? (
+                      <tr><td colSpan={5} className="px-6 py-4 text-center text-gray-500">暂无用户</td></tr>
+                    ) : (
+                      users.map((u) => (
+                        <tr key={u.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{u.username}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.username}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.role}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.created_at}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex space-x-2">
+                              <button className="text-green-600 hover:text-green-900">
+                                <EditIcon />
+                              </button>
+                              <button className="text-red-600 hover:text-red-900">
+                                <Trash2Icon />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -455,8 +550,6 @@ export default function AdminDashboard() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">数据备份</h3>
                 <div className="space-y-4">
                   <button onClick={handleBackup} className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors">立即备份数据</button>
-                  <button className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition-colors">恢复数据</button>
-                  <div className="text-sm text-gray-500">最后备份时间：2024-01-15 10:30:00</div>
                 </div>
               </div>
             </div>

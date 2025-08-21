@@ -37,13 +37,12 @@ export default function AIAssistant() {
     }));
   };
 
-  // 生成提示词
-  const generatePrompt = () => {
+  // 首轮带标签的提示文本（仅用于发送到后端，不用于对话框显示）
+  const buildFirstTurnPrompt = () => {
     const tags = Object.entries(selectedTags)
       .filter(([_, value]) => value)
       .map(([key, value]) => `${key}: ${value}`)
       .join(", ");
-    
     return `请根据以下标签要求创作${mode === "idea" ? "剧本创意与大纲" : mode === "segment" ? "剧本片段" : "剧本修改建议"}：${tags}。${prompt}`;
   };
 
@@ -53,10 +52,13 @@ export default function AIAssistant() {
       return;
     }
 
+    const isFirstTurn = messages.length === 0;
+
+    // 对话框中仅显示用户本次输入内容（不重复标签）
     const userMessage = {
       id: Date.now().toString(),
       type: "user" as const,
-      content: generatePrompt(),
+      content: prompt,
       timestamp: new Date()
     };
 
@@ -64,30 +66,48 @@ export default function AIAssistant() {
     setLoading(true);
 
     try {
+      // 提取最近 8 条历史并映射为 API 可读格式（包含刚刚的 userMessage）
+      const history = [...messages, userMessage]
+        .slice(-8)
+        .map(m => ({ role: m.type === "user" ? "user" : "assistant", content: m.content }));
+
+      // 构造请求参数：首轮包含标签，随后仅带主题
+      const requestParams = isFirstTurn
+        ? { theme: prompt, genre: selectedTags.genre, era: selectedTags.era, roles: [], draft: "" }
+        : { theme: prompt, roles: [], draft: "" };
+
+      // 首轮提示词放到 theme 中由服务端模板处理，这里保持与现有 API 兼容
       const res = await fetch("/api/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode,
-          params: {
-            theme: prompt,
-            genre: selectedTags.genre,
-            era: selectedTags.era,
-            roles: [],
-            draft: ""
-          }
+          // 为了兼容服务端模板：首轮服务端会读取 genre/era 等；非首轮仅有 theme
+          params: requestParams,
+          history
         })
       });
-      
-      const json = await res.json();
-      
+
+      let reply = "";
+      try {
+        const json = await res.json();
+        if (!res.ok) {
+          reply = json?.error
+            ? `生成失败：${json.error}${json.error.includes("OPENAI_API_KEY") ? "。请在 .env.local 配置 OPENAI_API_KEY 并重启服务" : ""}`
+            : `生成失败（HTTP ${res.status}）`;
+        } else {
+          reply = json.text || "生成失败，请重试";
+        }
+      } catch {
+        reply = `生成失败（无法解析响应，HTTP ${res.status}）`;
+      }
+
       const assistantMessage = {
         id: (Date.now() + 1).toString(),
         type: "assistant" as const,
-        content: json.text || "生成失败，请重试",
+        content: reply,
         timestamp: new Date()
       };
-
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       const errorMessage = {
@@ -125,23 +145,7 @@ export default function AIAssistant() {
             </button>
           </div>
         </div>
-        
-        {/* 模式选择 */}
-        <div className="mt-4 flex gap-2">
-          {(["idea","segment","review"] as const).map(m => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={`px-3 py-1 rounded border transition-colors text-sm ${
-                mode === m 
-                  ? "bg-red-600 text-white border-red-600" 
-                  : "bg-transparent text-gray-700 border-gray-300 hover:border-red-300"
-              }`}
-            >
-              {m === "idea" ? "创意大纲" : m === "segment" ? "片段生成" : "修改建议"}
-            </button>
-          ))}
-        </div>
+        {/* 模式选择：按需求隐藏按钮，固定为‘创意大纲’*/}
       </div>
 
       {/* 标签选择区域 */}
@@ -208,7 +212,6 @@ export default function AIAssistant() {
             </div>
           ))
         )}
-        
         {loading && (
           <div className="flex justify-start">
             <div className="bg-white border border-gray-200 rounded-lg px-4 py-3">
