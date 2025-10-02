@@ -95,7 +95,7 @@ export default function AIAssistant() {
         const json = await res.json();
         if (!res.ok) {
           reply = json?.error
-            ? `生成失败：${json.error}${json.error.includes("OPENAI_API_KEY") ? "。请在 .env.local 配置 OPENAI_API_KEY 并重启服务" : ""}`
+            ? `生成失败：${json.error}`
             : `生成失败（HTTP ${res.status}）`;
         } else {
           reply = json.text || "生成失败，请重试";

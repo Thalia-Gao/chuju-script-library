@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: chuju-archive
+    env: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MODELSCOPE_API_KEY
+        value: ms-e2b930dd-c68d-4e88-bfdc-b2796e8cd6a9
+      - key: MODELSCOPE_BASE_URL
+        value: https://api-inference.modelscope.cn/v1
+      - key: MODELSCOPE_MODEL
+        value: Qwen/Qwen3-VL-235B-A22B-Instruct
+      - key: JWT_SECRET
+        generateValue: true
+    disk:
+      name: chuju-data
+      mountPath: /app/data
+      sizeGB: 1
+    # 确保静态资源目录被正确部署
+    staticPublishPath: ./public 

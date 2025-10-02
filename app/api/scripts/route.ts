@@ -3,6 +3,7 @@
  */
 import { NextResponse } from "next/server";
 import { all, run, get } from "@/lib/db";
+import { getCoverUrlById } from "@/lib/script-covers-mapping";
 import { v4 as uuid } from "uuid";
 import path from "path";
 import fs from "fs";
@@ -46,7 +47,8 @@ export async function GET(req: Request) {
     era: r.era,
     author: r.author,
     excerpt: r.excerpt,
-    cover_url: r.cover_url,
+    // 使用静态映射获取封面URL，确保部署时的稳定性
+    cover_url: getCoverUrlById(r.id) || null,
     tags: r.tags ? (r.tags as string).split("|") : []
   }));
   

@@ -8,12 +8,11 @@ import fs from "fs";
 import OpenAI from "openai";
 
 export async function POST(req: Request) {
-  const apiKey = process.env.OPENAI_API_KEY || process.env.SILICONFLOW_API_KEY;
-  const baseURL = process.env.OPENAI_BASE_URL || process.env.SILICONFLOW_BASE_URL || "https://api.siliconflow.cn/v1";
-  const model = process.env.OPENAI_MODEL || process.env.SILICONFLOW_MODEL || "deepseek-ai/DeepSeek-V3";
-  if (!apiKey) {
-    return NextResponse.json({ error: "缺少 LLM_API_KEY" }, { status: 500 });
-  }
+  // 使用 ModelScope 配置
+  const apiKey = "ms-e2b930dd-c68d-4e88-bfdc-b2796e8cd6a9";
+  const baseURL = "https://api-inference.modelscope.cn/v1";
+  const model = "Qwen/Qwen3-VL-235B-A22B-Instruct";
+  
   const client = new OpenAI({ apiKey, baseURL });
   const body = await req.json();
   const { mode, query, params, history } = body || {};
@@ -32,39 +31,34 @@ export async function POST(req: Request) {
   const sys = `你是资深楚剧编剧 AI 助手，熟悉楚剧唱念做打、行当与程式。请结合提供的典藏文献片段进行创作与建议，语言符合舞台文本规范。`;
 
   // 仅首轮带标签；后续轮次仅带本轮主题（theme）
-  const userPrompt = (() => {
-    if (mode === "idea") {
-      if (isFirstTurn) {
-        const filtered: any = {};
-        if (params?.theme) filtered.theme = params.theme;
-        if (params?.genre) filtered.genre = params.genre;
-        if (params?.era) filtered.era = params.era;
-        if (params?.roles) filtered.roles = params.roles;
-        return `请基于主题/题材/背景/角色信息，给出3个不同方向的楚剧故事创意与剧情大纲：\n参数: ${JSON.stringify(filtered)}\n---参考片段---\n${context}`;
-      }
-      return `延续以上对话语境，请继续创作并细化：${params?.theme || "(无显式主题)"}\n---参考片段---\n${context}`;
-    }
-    if (mode === "segment") {
-      if (isFirstTurn) {
-        return `请根据以下场景与情节要求，生成一个楚剧片段（含人物表、念白、唱词、舞台调度与打击点提示）：\n参数: ${JSON.stringify(params || {})}\n---参考片段---\n${context}`;
-      }
-      return `延续以上剧情，请生成新的楚剧片段：${params?.theme || "(无显式主题)"}\n---参考片段---\n${context}`;
-    }
-    if (mode === "review") {
-      if (isFirstTurn) {
-        return `请对用户提供的剧本文本给出修改建议（剧情逻辑、语言、角色塑造、舞台性）：\n用户稿件: ${params?.draft || "(未提供)"}\n---参考片段---\n${context}`;
-      }
-      return `请继续就上述文本给出进一步修改建议：${params?.theme || "(无显式主题)"}\n---参考片段---\n${context}`;
-    }
-    return String(query || "");
-  })();
+  const userPrompt = (
+    isFirstTurn
+      ? `【创作模式】${mode}
+【主题】${params?.theme || query || ""}
+${params?.genre ? `【体裁】${params.genre}` : ""}
+${params?.era ? `【时代】${params.era}` : ""}
+${params?.structure ? `【结构】${params.structure}` : ""}
+${params?.roles?.length ? `【角色】${params.roles.join("、")}` : ""}
+${params?.draft ? `【草稿】${params.draft}` : ""}
+
+【典藏文献参考】
+${context || "（无相关文献）"}
+
+请根据以上信息进行楚剧创作或建议。`
+      : `【主题】${params?.theme || query || ""}
+${params?.draft ? `【草稿】${params.draft}` : ""}
+
+【典藏文献参考】
+${context || "（无相关文献）"}
+
+请继续创作或提供建议。`
+  );
 
   // 将历史对话（最近8条）插入到系统提示之后
-  const safeHistory: Array<{ role: "user"|"assistant"; content: string }> = Array.isArray(history)
-    ? history
-        .slice(-8)
-        .filter((m: any) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
-    : [];
+  const safeHistory: Array<{ role: "user"|"assistant"; content: string }> = 
+    Array.isArray(history) 
+      ? history.filter((m: any) => m?.role && typeof m.content === "string").slice(-8).map((m: any) => ({ role: m.role, content: m.content })).filter((m: any) =>  typeof m.content === "string")
+      : [];
 
   try {
     const resp = await client.chat.completions.create({
@@ -88,15 +82,12 @@ export async function POST(req: Request) {
 }
 
 function loadCorpus(limit = 50) {
-  const rows = all<any>("SELECT id, title, alias, era, author, markdown_path FROM scripts ORDER BY created_at DESC");
-  const docs = rows.slice(0, limit).map((r) => ({
-    id: r.id,
-    title: r.title,
-    era: r.era,
-    author: r.author,
-    text: fs.readFileSync(r.markdown_path, "utf-8").slice(0, 5000)
-  }));
-  const mini = new MiniSearch({ fields: ["title", "text", "era", "author"], storeFields: ["title", "text"] });
+  const rows = all<any>("SELECT id, title, markdown_path FROM scripts ORDER BY RANDOM() LIMIT ?", [limit]);
+  const docs = rows.map((r) => {
+    const md = fs.existsSync(r.markdown_path) ? fs.readFileSync(r.markdown_path, "utf-8") : "";
+    return { id: r.id, title: r.title, text: md.slice(0, 2000) };
+  });
+  const mini = new MiniSearch({ fields: ["title", "text"], storeFields: ["title", "text"] });
   mini.addAll(docs);
   return { mini, docs };
 } 

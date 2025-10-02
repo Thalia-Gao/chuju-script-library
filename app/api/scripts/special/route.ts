@@ -4,6 +4,7 @@
  */
 import { NextResponse } from "next/server";
 import { all } from "@/lib/db";
+import { getCoverUrlById } from "@/lib/script-covers-mapping";
 
 export async function GET(req: Request) {
   try {
@@ -33,7 +34,8 @@ export async function GET(req: Request) {
       era: r.era,
       author: r.author,
       excerpt: r.excerpt,
-      coverUrl: r.cover_url,
+      // 使用静态映射获取封面URL
+      coverUrl: getCoverUrlById(r.id) || null,
       markdownPath: r.markdown_path,
       tags: r.tags ? (r.tags as string).split("|") : [],
       createdAt: r.created_at
@@ -43,14 +45,8 @@ export async function GET(req: Request) {
       title,
       items,
       total: items.length,
-      hasPendingTask: items.some(item => {
-        try {
-          const parsed = JSON.parse(item.coverUrl || "{}");
-          return parsed.taskId && parsed.status === "PENDING";
-        } catch {
-          return false;
-        }
-      })
+      // 由于使用静态映射，不再有pending任务的概念
+      hasPendingTask: false
     });
   } catch (e: any) {
     console.error("Special Scripts API Error:", e);

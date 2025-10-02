@@ -19,13 +19,14 @@ dist/
 .env.test.local
 .env.production.local
 
-# Database files
-*.db
-*.sqlite
-*.sqlite3
-data/
-chuju.db
-database.db
+# 注意：为了确保Render部署时能获取完整数据，以下文件需要被包含在仓库中
+# 数据库文件 - 包含在仓库中以确保部署时有完整数据
+# *.db
+# *.sqlite
+# *.sqlite3
+# data/
+# chuju.db
+# database.db
 
 # OS generated files
 .DS_Store
@@ -42,8 +43,9 @@ Thumbs.db
 *.swp
 *.swo
 
-# Logs
+# Logs (保留部署日志但排除开发日志)
 logs
+dev-server.log
 *.log
 
 # Runtime data
@@ -64,6 +66,12 @@ virtual-scripts-report.md
 current-task.json
 official-task.json
 
-# Keep content and public directories for the archive
-# content/
-# public/ 
+# 重要：以下目录包含项目核心数据，必须包含在仓库中
+# content/ - 剧本Markdown文件
+# public/stills-* - 剧照图片文件
+# data/ - 数据库文件
+
+# 排除一些大的临时文件但保留核心资源
+*.zip
+*.tar.gz
+backup-*.sql 
