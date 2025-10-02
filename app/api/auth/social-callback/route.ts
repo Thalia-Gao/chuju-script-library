@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sign } from 'jsonwebtoken';
 import { cookies } from 'next/headers';
-import db from '@/lib/db'; // Jscbc: 假设你有一个数据库模块
+import { db } from '@/lib/db'; // Jscbc: 使用命名导入
 
 // Jscbc: 此路由是用户在第三方平台授权后，被重定向回来的地址
 export async function GET(req: NextRequest) {
@@ -56,6 +56,7 @@ export async function GET(req: NextRequest) {
       openid = wxOpenid;
 
       // Step 2: 用 access_token 和 openid 获取用户信息
+      if (!openid) throw new Error('Failed to get WeChat openid');
       const userParams = new URLSearchParams({ access_token, openid, lang: 'zh_CN' });
       const userRes = await fetch(`https://api.weixin.qq.com/sns/userinfo?${userParams.toString()}`);
       const wxUserInfo = await userRes.json();
