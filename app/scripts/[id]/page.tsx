@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { getCoverUrlById } from "@/lib/script-covers-mapping";
 import ScriptCoverImage from "@/components/ScriptCoverImage";
 import CollapsibleMarkdown from "@/components/CollapsibleMarkdown";
+import fs from "fs";
+import path from "path";
 
 // Jscbc: 直接查询数据库获取剧本详情
 async function fetchDetailDirect(id: string) {
@@ -26,10 +28,24 @@ async function fetchDetailDirect(id: string) {
     return null;
   }
   
+  // 读取剧本内容文件
+  let content = '';
+  if (result.markdown_path) {
+    try {
+      const contentPath = path.join(process.cwd(), result.markdown_path);
+      if (fs.existsSync(contentPath)) {
+        content = fs.readFileSync(contentPath, 'utf-8');
+      }
+    } catch (error) {
+      console.error('读取剧本内容失败:', error);
+    }
+  }
+  
   return {
     ...result,
     tags: result.tags ? result.tags.split(',') : [],
     cover_url: getCoverUrlById(result.id) || null,
+    content: content
   };
 }
 
