@@ -1,0 +1,74 @@
+name: Keep Render Site Alive
+
+# Jscbc: 防止Render网站15分钟休眠的GitHub Actions配置
+on:
+  # 定时触发：每10分钟执行一次
+  schedule:
+    - cron: '*/10 * * * *'
+  
+  # 手动触发
+  workflow_dispatch:
+    inputs:
+      site_url:
+        description: 'Render网站URL'
+        required: true
+        default: 'https://chuju-script-library.onrender.com'
+        type: string
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Keep Render site alive
+        run: |
+          # 获取网站URL
+          SITE_URL="${{ github.event.inputs.site_url || 'https://chuju-script-library.onrender.com' }}"
+          
+          echo "正在访问网站: $SITE_URL"
+          
+          # 访问首页
+          curl -s -o /dev/null -w "首页状态码: %{http_code}\n" "$SITE_URL"
+          
+          # 访问API端点
+          curl -s -o /dev/null -w "API状态码: %{http_code}\n" "$SITE_URL/api/scripts"
+          
+          # 访问特定剧本页面（随机选择一个）
+          SCRIPT_ID="F80C637DAB8033C49077E14C7A95BB09"
+          curl -s -o /dev/null -w "剧本页面状态码: %{http_code}\n" "$SITE_URL/scripts/$SCRIPT_ID"
+          
+          # 访问剧本API
+          curl -s -o /dev/null -w "剧本API状态码: %{http_code}\n" "$SITE_URL/api/scripts/$SCRIPT_ID"
+          
+          echo "✅ 网站保活完成 - $(date)"
+      
+      - name: Health check with retry
+        run: |
+          SITE_URL="${{ github.event.inputs.site_url || 'https://chuju-script-library.onrender.com' }}"
+          
+          # 重试机制：最多重试3次
+          for i in {1..3}; do
+            echo "第 $i 次健康检查..."
+            
+            # 检查网站是否响应
+            if curl -s -f "$SITE_URL" > /dev/null; then
+              echo "✅ 网站健康检查通过"
+              break
+            else
+              echo "❌ 第 $i 次检查失败"
+              if [ $i -eq 3 ]; then
+                echo "❌ 所有健康检查都失败"
+                exit 1
+              fi
+              sleep 10
+            fi
+          done
+      
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ 网站保活失败 - $(date)"
+          echo "请检查Render部署状态"
