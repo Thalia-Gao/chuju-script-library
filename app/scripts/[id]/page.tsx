@@ -125,6 +125,7 @@ export default async function ScriptPage({ params }: { params: { id: string } })
                   </div>
                 </div>
 
+                {/* Jscbc: 只显示一张剧照，与首页保持一致 */}
                 <div className="lg:col-span-1">
                   {data.cover_url && (
                     <div className="bg-gray-100 rounded-lg overflow-hidden">
