@@ -72,85 +72,85 @@ export default async function ScriptPage({ params }: { params: { id: string } })
   }
 
   return (
-    <>
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="bg-white shadow-xl rounded-lg overflow-hidden">
-            <div className="p-6 sm:p-8">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900">{data.title}</h1>
-                  {data.alias && (
-                    <p className="text-lg text-gray-600 mt-1">（{data.alias}）</p>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* 剧本基本信息卡片 */}
+        <div className="bg-white shadow-xl rounded-lg overflow-hidden mb-8">
+          <div className="p-6 sm:p-8">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">{data.title}</h1>
+                {data.alias && (
+                  <p className="text-lg text-gray-600 mt-1">（{data.alias}）</p>
+                )}
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-500">剧本ID: {data.id}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">时代背景</span>
+                      <p className="text-lg">{data.era || "未标注"}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">作者</span>
+                      <p className="text-lg">{data.author || "未知"}</p>
+                    </div>
+                  </div>
+
+                  {data.tags && data.tags.length > 0 && (
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">标签</span>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {data.tags.map((tag: string) => (
+                          <span key={tag} className="px-3 py-1 bg-red-50 text-red-600 rounded-full text-sm border border-red-200">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   )}
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-500">剧本ID: {data.id}</p>
+
+                  {data.excerpt && (
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">简介</span>
+                      <p className="text-gray-700 mt-1 leading-relaxed">{data.excerpt}</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2">
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <span className="text-sm font-medium text-gray-500">时代背景</span>
-                        <p className="text-lg">{data.era || "未标注"}</p>
-                      </div>
-                      <div>
-                        <span className="text-sm font-medium text-gray-500">作者</span>
-                        <p className="text-lg">{data.author || "未知"}</p>
-                      </div>
-                    </div>
-
-                    {data.tags && data.tags.length > 0 && (
-                      <div>
-                        <span className="text-sm font-medium text-gray-500">标签</span>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {data.tags.map((tag: string) => (
-                            <span key={tag} className="px-3 py-1 bg-red-50 text-red-600 rounded-full text-sm border border-red-200">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {data.excerpt && (
-                      <div>
-                        <span className="text-sm font-medium text-gray-500">简介</span>
-                        <p className="text-gray-700 mt-1 leading-relaxed">{data.excerpt}</p>
-                      </div>
-                    )}
+              {/* Jscbc: 只显示一张剧照，与首页保持一致 */}
+              <div className="lg:col-span-1">
+                {data.cover_url && (
+                  <div className="bg-gray-100 rounded-lg overflow-hidden">
+                    <ScriptCoverImage
+                      src={data.cover_url}
+                      alt={`《${data.title}》剧照`}
+                      className="w-full h-auto object-cover"
+                    />
                   </div>
-                </div>
-
-                {/* Jscbc: 只显示一张剧照，与首页保持一致 */}
-                <div className="lg:col-span-1">
-                  {data.cover_url && (
-                    <div className="bg-gray-100 rounded-lg overflow-hidden">
-                      <ScriptCoverImage
-                        src={data.cover_url}
-                        alt={`《${data.title}》剧照`}
-                        className="w-full h-auto object-cover"
-                      />
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
             </div>
           </div>
+        </div>
 
-          <section className="bg-white shadow-xl rounded-lg overflow-hidden">
-            <div className="p-6 sm:p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">剧本正文</h2>
-              <div className="prose prose-lg max-w-none">
-                <CollapsibleMarkdown content={data.content} />
-              </div>
+        {/* 剧本正文 */}
+        <div className="bg-white shadow-xl rounded-lg overflow-hidden">
+          <div className="p-6 sm:p-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">剧本正文</h2>
+            <div className="prose prose-lg max-w-none">
+              <CollapsibleMarkdown content={data.content} />
             </div>
-          </section>
+          </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
