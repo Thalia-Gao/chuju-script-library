@@ -3,7 +3,7 @@
  * 这个文件包含所有剧本ID与对应剧照URL的静态映射关系
  * 用于部署时确保剧本和剧照的正确匹配
  * 
- * 自动生成于: 2025-10-02T14:11:15.167Z
+ * 自动生成于: 2025-10-03T01:22:25.063Z
  * 总计剧本数: 196
  */
 
@@ -196,7 +196,7 @@ export const SCRIPT_COVERS_MAPPING: ScriptCoverMapping[] = [
   { id: "CB1D16D9A96AF3819EA9D1FABBF96393", title: "送端阳", cover_url: "/stills-dmx/CB1D16D9A96AF3819EA9D1FABBF96393.png" },
   { id: "3AD3F57C8EB60B4C8CF0C12C13F292C5", title: "送香茶", cover_url: "/stills-dmx/3AD3F57C8EB60B4C8CF0C12C13F292C5.png" },
   { id: "95D0661CE55D3D09A24D88DB87345B50", title: "逃水荒", cover_url: "/stills-dmx/95D0661CE55D3D09A24D88DB87345B50.png" },
-  { id: "C2358DCA375474D1CBE8D5019F9DBC46", title: "逼休自缢", cover_url: "/stills-qwen/C2358DCA375474D1CBE8D5019F9DBC46.png" },
+  { id: "C2358DCA375474D1CBE8D5019F9DBC46", title: "逼休自缢", cover_url: "/stills-dmx/C2358DCA375474D1CBE8D5019F9DBC46.png" },
   { id: "F6A53FFB6EC715B800A35E6F63FA3D5C", title: "郭丁香", cover_url: "/stills-qwen/F6A53FFB6EC715B800A35E6F63FA3D5C.png" },
   { id: "EFD1055A15CB8FCFCA20CB70EB36F9E6", title: "酒醉花魁", cover_url: "/stills-dmx/EFD1055A15CB8FCFCA20CB70EB36F9E6.png" },
   { id: "B5DC2AA56014814D9CE647B2BE1958FF", title: "金石缘", cover_url: "/stills-qwen/B5DC2AA56014814D9CE647B2BE1958FF.png" },
